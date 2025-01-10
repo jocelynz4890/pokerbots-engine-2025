@@ -105,18 +105,19 @@ class Player(Bot):
         my_bounty = round_state.bounties[active]  # your current bounty rank
         my_contribution = STARTING_STACK - my_stack  # the number of chips you have contributed to the pot
         opp_contribution = STARTING_STACK - opp_stack  # the number of chips your opponent has contributed to the pot
-        print(self.estimator.estimate(my_cards, board_cards, my_bounty))
+        estimate = self.estimator.estimate(my_cards, board_cards, my_bounty)
+        print(estimate)
         
         if RaiseAction in legal_actions:
            min_raise, max_raise = round_state.raise_bounds()  # the smallest and largest numbers of chips for a legal bet/raise
            min_cost = min_raise - my_pip  # the cost of a minimum bet/raise
            max_cost = max_raise - my_pip  # the cost of a maximum bet/raise
         if RaiseAction in legal_actions:
-            if random.random() < 0.5:
-                return RaiseAction(min_raise)
+            if estimate[0] > 0.5:
+                return RaiseAction(max_raise)
         if CheckAction in legal_actions:  # check-call
             return CheckAction()
-        if random.random() < 0.25:
+        if estimate[0] < 0.25:
             return FoldAction()
         return CallAction()
 
