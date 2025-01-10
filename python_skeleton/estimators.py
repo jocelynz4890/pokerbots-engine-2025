@@ -9,7 +9,8 @@ class EquityEstimator:
 class MonteCarloEstimator(EquityEstimator):
 
     def estimate(self, my_cards, board_cards, my_bounty):
-        SIMULATION_ROUNDS = 100
+        SIMULATION_ROUNDS = 1000
+        ranks = ('2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A')
         my_cards = list(map(eval7.Card, my_cards))
         board_cards = list(map(eval7.Card, board_cards))
         revealed_cards = my_cards + board_cards
@@ -30,7 +31,9 @@ class MonteCarloEstimator(EquityEstimator):
             my_score = eval7.evaluate(revealed_cards)
             opp_score = eval7.evaluate(opp_cards + new_board_cards)
             wins += (my_score > opp_score)
-            bounty_wins += ((my_score > opp_score) and (my_bounty in map(lambda c: ('2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A')[c.rank], revealed_cards)))
+            bounty_wins += ((my_score > opp_score) and (my_bounty in map(lambda c: ranks[c.rank], revealed_cards)))
             ties += (my_score == opp_score)
             
+        if ties == SIMULATION_ROUNDS:
+            return 0, 0
         return wins/(SIMULATION_ROUNDS-ties), bounty_wins/(SIMULATION_ROUNDS-ties)
