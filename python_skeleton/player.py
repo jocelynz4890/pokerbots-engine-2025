@@ -93,8 +93,8 @@ class Player(Bot):
         Your action.
         '''
         MAX_RAISE_RATIO = 0.5 # proportion of EV to raise by
-        ALL_IN_EQUITY_THRESHOLD = 0.7
-        ALL_IN_PROB = 0.3
+        ALL_IN_EQUITY_THRESHOLD = 0.68
+        ALL_IN_PROB = 0.9
         legal_actions = round_state.legal_actions()  # the actions you are allowed to take
         street = round_state.street  # 0, 3, 4, or 5 representing pre-flop, flop, turn, or river respectively
         my_cards = round_state.hands[active]  # your cards
