@@ -9,7 +9,7 @@ from skeleton.runner import parse_args, run_bot
 
 import random
 from estimators import MonteCarloEstimator
-
+BOUNTY_CONSTANT, BOUNTY_RATIO = 10, 1.5
 
 class Player(Bot):
     '''
@@ -92,6 +92,8 @@ class Player(Bot):
         Returns:
         Your action.
         '''
+        MAX_RAISE_RATIO = 0.5 # proportion of EV to raise by
+        ALL_IN_EQUITY_THRESHOLD = 0.7
         legal_actions = round_state.legal_actions()  # the actions you are allowed to take
         street = round_state.street  # 0, 3, 4, or 5 representing pre-flop, flop, turn, or river respectively
         my_cards = round_state.hands[active]  # your cards
@@ -105,21 +107,33 @@ class Player(Bot):
         my_bounty = round_state.bounties[active]  # your current bounty rank
         my_contribution = STARTING_STACK - my_stack  # the number of chips you have contributed to the pot
         opp_contribution = STARTING_STACK - opp_stack  # the number of chips your opponent has contributed to the pot
-        estimate = self.estimator.estimate(my_cards, board_cards, my_bounty)
-        print(estimate)
-        
+        equity, bounty_prob = self.estimator.estimate(my_cards, board_cards, my_bounty)
+        ev = (opp_pip + my_pip) * (equity - bounty_prob) + ((opp_pip) * BOUNTY_RATIO + BOUNTY_CONSTANT + my_pip) * (bounty_prob) # ev of payout assuming you've lost your pips
+        max_wanted_raise = ev * MAX_RAISE_RATIO
         if RaiseAction in legal_actions:
-           min_raise, max_raise = round_state.raise_bounds()  # the smallest and largest numbers of chips for a legal bet/raise
-           min_cost = min_raise - my_pip  # the cost of a minimum bet/raise
-           max_cost = max_raise - my_pip  # the cost of a maximum bet/raise
-        if RaiseAction in legal_actions:
-            if estimate[0] > 0.6:
+            min_raise, max_raise = round_state.raise_bounds()  # the smallest and largest numbers of chips for a legal bet/raise
+            min_cost = min_raise - my_pip  # the cost of a minimum bet/raise
+            max_cost = max_raise - my_pip  # the cost of a maximum bet/raise
+            if equity > ALL_IN_EQUITY_THRESHOLD:
                 return RaiseAction(max_raise)
-        if estimate[0] < 0.4:
-            return FoldAction()
-        if CheckAction in legal_actions:  # check-call
+            if max_wanted_raise > min_cost:
+                return RaiseAction(int(min(max_wanted_raise, max_cost)) + my_pip)
+        if ev > continue_cost and CallAction in legal_actions:
+            return CallAction()
+        if CheckAction in legal_actions:
             return CheckAction()
-        return CallAction()
+        return FoldAction()
+        
+        
+        
+        # if RaiseAction in legal_actions:
+        #     if estimate[0] > 0.6:
+        #         return RaiseAction(max_raise)
+        # if estimate[0] < 0.4:
+        #     return FoldAction()
+        # if CheckAction in legal_actions:  # check-call
+        #     return CheckAction()
+        # return CallAction()
 
 
 if __name__ == '__main__':

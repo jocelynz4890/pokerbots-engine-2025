@@ -48,7 +48,7 @@ class MonteCarloEstimator(EquityEstimator):
         }
 
 
-        SIMULATION_ROUNDS = 5000
+        SIMULATION_ROUNDS = 1000
         ranks = ('2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A')
         suits = ('c', 'd', 'h', 's')
         my_cards = list(map(eval7.Card, my_cards))
@@ -59,7 +59,7 @@ class MonteCarloEstimator(EquityEstimator):
         if not street:
             hand_ranks = [ranks[c.rank] for c in my_cards]
             prob = hand_strength["".join(hand_ranks + ["s" if suits[my_cards[0].suit] == suits[my_cards[0].suit] else "o"])]/100
-            return prob, prob if my_bounty in hand_ranks else 0
+            return prob, prob if my_bounty in hand_ranks else 1-(48/52)**5
         
         deck = eval7.Deck()
         deck.cards = [card for card in deck.cards if card not in revealed_cards]
