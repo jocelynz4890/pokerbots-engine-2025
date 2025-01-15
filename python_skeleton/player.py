@@ -97,7 +97,7 @@ class Player(Bot):
         MAX_CALL_RATIO = 0.99 # proportion of theo call to call ---- should go up over time
         MAX_RAISE_RATIO = 0.3 # proportion of theo call to raise by ---- should go up over time
         ALL_IN_EQUITY_FLOOR = 0.70
-        ALL_IN_EQUITY_CEIL = 0.80
+        ALL_IN_EQUITY_CEIL = 1.
         ALL_IN_PROB = 0.99
         APPROX_MAX_PREFLOP_PAYOUT = 5
         legal_actions = round_state.legal_actions()  # the actions you are allowed to take
