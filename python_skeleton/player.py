@@ -96,6 +96,7 @@ class Player(Bot):
         ALL_IN_EQUITY_THRESHOLD = 0.70
         ALL_IN_PROB = 0.99
         APPROX_MAX_PREFLOP_PAYOUT = 5
+        PREFLOP_FOLD_EV_THRESHOLD = 1.7 # [0, 3]
         legal_actions = round_state.legal_actions()  # the actions you are allowed to take
         street = round_state.street  # 0, 3, 4, or 5 representing pre-flop, flop, turn, or river respectively
         my_cards = round_state.hands[active]  # your cards
@@ -116,8 +117,13 @@ class Player(Bot):
             return FoldAction()
 
         equity, bounty_prob = self.estimator.estimate(my_cards, board_cards, my_bounty)
-        ev = (opp_pip + my_pip) * (equity - bounty_prob) + ((opp_pip) * BOUNTY_RATIO + BOUNTY_CONSTANT + my_pip) * (bounty_prob) # ev of payout assuming you've lost your pips
+        ev = (opp_pip + my_pip) * (equity - bounty_prob) + ((opp_pip) * BOUNTY_RATIO + BOUNTY_CONSTANT + my_pip) * (bounty_prob) # ev of payout assuming you've lost your pips in [0, pot]
         max_wanted_raise = ev * MAX_RAISE_RATIO
+        print(f"round {game_state.round_num}, equity {equity}, ev {ev}")
+        #preflop folding
+        if ev < PREFLOP_FOLD_EV_THRESHOLD and street == 0:
+            return FoldAction()
+        
         if RaiseAction in legal_actions:
             min_raise, max_raise = round_state.raise_bounds()  # the smallest and largest numbers of chips for a legal bet/raise
             min_cost = min_raise - my_pip  # the cost of a minimum bet/raise
