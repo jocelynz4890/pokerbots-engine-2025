@@ -94,7 +94,7 @@ class Player(Bot):
         '''
         street = round_state.street
 
-        MAX_CALL_RATIO = 0.99 # proportion of theo call to call ---- should go up over time
+        MAX_CALL_RATIO = 0.6 # proportion of theo call to call ---- should go up over time
         MAX_RAISE_RATIO = 0.3 # proportion of theo call to raise by ---- should go up over time
         ALL_IN_EQUITY_FLOOR = 0.70
         ALL_IN_EQUITY_CEIL = 1.
@@ -116,8 +116,8 @@ class Player(Bot):
 
         rounds_left = 1001 - game_state.round_num
         bankroll = game_state.bankroll
-        if bankroll > APPROX_MAX_PREFLOP_PAYOUT * rounds_left:
-            return FoldAction()
+        # if bankroll > APPROX_MAX_PREFLOP_PAYOUT * rounds_left:
+        #     return FoldAction()
 
         equity, bounty_prob = self.estimator.estimate(my_cards, board_cards, my_bounty)
         if equity == 1.:

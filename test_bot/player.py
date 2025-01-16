@@ -26,7 +26,13 @@ class Player(Bot):
         Returns:
         Nothing.
         '''
-        pass
+        self.q_table = {}  
+        self.alpha = 0.1  # keep learning rate low
+        self.gamma = 0.9  # Discount factor
+        self.epsilon = 0.1  # Exploration rate (epsilon-greedy)
+        self.last_action = None
+        self.last_state = None
+        self.last_reward = None
 
     def handle_new_round(self, game_state, round_state, active):
         '''
@@ -47,7 +53,7 @@ class Player(Bot):
         #big_blind = bool(active)  # True if you are the big blind
         #my_bounty = round_state.bounties[active]  # your current bounty rank
         self.estimator = MonteCarloEstimator()
-        pass
+        self.last_state = None
 
     def handle_round_over(self, game_state, terminal_state, active):
         '''
@@ -61,7 +67,7 @@ class Player(Bot):
         Returns:
         Nothing.
         '''
-        #my_delta = terminal_state.deltas[active]  # your bankroll change from this round
+        my_delta = terminal_state.deltas[active]  # your bankroll change from this round
         previous_state = terminal_state.previous_state  # RoundState before payoffs
         #street = previous_state.street  # 0, 3, 4, or 5 representing when this round ended
         #my_cards = previous_state.hands[active]  # your cards
@@ -78,6 +84,11 @@ class Player(Bot):
             print("I hit my bounty of " + bounty_rank + "!")
         if opponent_bounty_hit:
             print("Opponent hit their bounty of " + opponent_bounty_rank + "!")
+            
+        # learn from round, reward is delta
+        self.learn(my_delta)
+        
+        print(self.q_table)
 
     def get_action(self, game_state, round_state, active):
         '''
@@ -92,6 +103,7 @@ class Player(Bot):
         Returns:
         Your action.
         '''
+        
         MAX_RAISE_RATIO = 0.5 # proportion of EV to raise by
         ALL_IN_EQUITY_THRESHOLD = 0.70
         ALL_IN_PROB = 0.99
@@ -118,31 +130,48 @@ class Player(Bot):
         equity, bounty_prob = self.estimator.estimate(my_cards, board_cards, my_bounty)
         ev = (opp_pip + my_pip) * (equity - bounty_prob) + ((opp_pip) * BOUNTY_RATIO + BOUNTY_CONSTANT + my_pip) * (bounty_prob) # ev of payout assuming you've lost your pips
         max_wanted_raise = ev * MAX_RAISE_RATIO
-        if RaiseAction in legal_actions:
-            min_raise, max_raise = round_state.raise_bounds()  # the smallest and largest numbers of chips for a legal bet/raise
-            min_cost = min_raise - my_pip  # the cost of a minimum bet/raise
-            max_cost = max_raise - my_pip  # the cost of a maximum bet/raise
-        #     if equity > ALL_IN_EQUITY_THRESHOLD and random.random() < ALL_IN_PROB:
-        #         return RaiseAction(max_raise)
-        #     if max_wanted_raise > min_cost:
-        #         return RaiseAction(int(min(max_wanted_raise, max_cost)) + my_pip)
-        # if ev > continue_cost and CallAction in legal_actions:
-        #     return CallAction()
-        # if CheckAction in legal_actions:
-        #     return CheckAction()
-        # return FoldAction()
         
+        state = (ev, my_pip, my_stack, my_contribution, street, opp_pip, opp_stack, opp_contribution)
         
-        if equity < 0.4:
-            return FoldAction()
-        if RaiseAction in legal_actions:
-            if equity > 0.6:
-                return RaiseAction(max_raise)
-        if equity < 0.4:
-            return FoldAction()
-        if CheckAction in legal_actions:  # check-call
-            return CheckAction()
-        return CallAction()
+        legal_actions_list = list(legal_actions)
+        
+        if RaiseAction in legal_actions_list:
+            min_raise, max_raise = round_state.raise_bounds()
+            possible_raises = range(min_raise, max_raise + 1, (max_raise - min_raise) // 3 or 1)
+            legal_actions_list.extend(RaiseAction(amount) for amount in possible_raises)
+
+        if random.random() < self.epsilon:
+            action = random.choice(legal_actions_list)
+        else:
+            action = self.select_best_action(state, legal_actions_list)
+
+        self.last_state = state
+        self.last_action = action
+        
+        return action
+    
+    
+    def select_best_action(self, state, legal_actions):
+        if state not in self.q_table:
+            self.q_table[state] = {action: 0 for action in legal_actions}
+
+        best_action = max(legal_actions, key=lambda action: self.q_table[state].get(action, 0))
+        return best_action
+
+    def learn(self, reward):
+        if self.last_state is None or self.last_action is None:
+            return
+
+        if self.last_state not in self.q_table:
+            self.q_table[self.last_state] = {}
+
+        if self.last_action not in self.q_table[self.last_state]:
+            self.q_table[self.last_state][self.last_action] = 0
+
+        prev_q_value = self.q_table[self.last_state][self.last_action]
+        next_max_q_value = max(self.q_table.get(self.last_state, {}).values(), default=0)
+        new_q_value = prev_q_value + self.alpha * (reward + self.gamma * next_max_q_value - prev_q_value)
+        self.q_table[self.last_state][self.last_action] = new_q_value
 
 
 if __name__ == '__main__':

@@ -47,7 +47,6 @@ class Player(Bot):
         #big_blind = bool(active)  # True if you are the big blind
         #my_bounty = round_state.bounties[active]  # your current bounty rank
         self.estimator = MonteCarloEstimator()
-        pass
 
     def handle_round_over(self, game_state, terminal_state, active):
         '''
@@ -112,8 +111,8 @@ class Player(Bot):
 
         rounds_left = 1001 - game_state.round_num
         bankroll = game_state.bankroll
-        if bankroll > APPROX_MAX_PREFLOP_PAYOUT * rounds_left:
-            return FoldAction()
+        # if bankroll > APPROX_MAX_PREFLOP_PAYOUT * rounds_left:
+        #     return FoldAction()
 
         equity, bounty_prob = self.estimator.estimate(my_cards, board_cards, my_bounty)
         ev = (opp_pip + my_pip) * (equity - bounty_prob) + ((opp_pip) * BOUNTY_RATIO + BOUNTY_CONSTANT + my_pip) * (bounty_prob) # ev of payout assuming you've lost your pips
