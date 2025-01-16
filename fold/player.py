@@ -92,16 +92,13 @@ class Player(Bot):
         Returns:
         Your action.
         '''
-        street = round_state.street
-
-        MAX_CALL_RATIO = 0.99 # proportion of theo call to call ---- should go up over time
-        MAX_RAISE_RATIO = 0.3 # proportion of theo call to raise by ---- should go up over time
-        ALL_IN_EQUITY_FLOOR = 0.70
-        ALL_IN_EQUITY_CEIL = 1.
+        MAX_RAISE_RATIO = 0.5 # proportion of EV to raise by
+        ALL_IN_EQUITY_THRESHOLD = 0.70
         ALL_IN_PROB = 0.99
         APPROX_MAX_PREFLOP_PAYOUT = 5
+        PREFLOP_FOLD_EV_THRESHOLD = 1.7 # [0, 3]
         legal_actions = round_state.legal_actions()  # the actions you are allowed to take
-          # 0, 3, 4, or 5 representing pre-flop, flop, turn, or river respectively
+        street = round_state.street  # 0, 3, 4, or 5 representing pre-flop, flop, turn, or river respectively
         my_cards = round_state.hands[active]  # your cards
         board_cards = round_state.deck[:street]  # the board cards
         print("board:", round_state.deck, "hand:", my_cards)
@@ -120,23 +117,22 @@ class Player(Bot):
             return FoldAction()
 
         equity, bounty_prob = self.estimator.estimate(my_cards, board_cards, my_bounty)
-        if equity == 1.:
-            theo_call = 800
-        else:
-            theo_call = ((opp_pip + my_pip) * (equity - bounty_prob) + ((opp_pip) * BOUNTY_RATIO + BOUNTY_CONSTANT + my_pip) * (bounty_prob)) / (1.-equity) # ev of payout assuming you've lost your pips in [0, pot]
-        max_wanted_call = theo_call * MAX_CALL_RATIO
-        max_wanted_raise = theo_call * MAX_RAISE_RATIO
-        print(f"round {game_state.round_num}, equity {equity}, theo call {theo_call}, my pip {my_pip}, opp pip {opp_pip}")
+        ev = (opp_pip + my_pip) * (equity - bounty_prob) + ((opp_pip) * BOUNTY_RATIO + BOUNTY_CONSTANT + my_pip) * (bounty_prob) # ev of payout assuming you've lost your pips in [0, pot]
+        max_wanted_raise = ev * MAX_RAISE_RATIO
+        print(f"round {game_state.round_num}, equity {equity}, ev {ev}")
+        #preflop folding
+        if ev < PREFLOP_FOLD_EV_THRESHOLD and street == 0:
+            return FoldAction()
         
         if RaiseAction in legal_actions:
             min_raise, max_raise = round_state.raise_bounds()  # the smallest and largest numbers of chips for a legal bet/raise
             min_cost = min_raise - my_pip  # the cost of a minimum bet/raise
             max_cost = max_raise - my_pip  # the cost of a maximum bet/raise
-            if ALL_IN_EQUITY_FLOOR < equity < ALL_IN_EQUITY_CEIL and random.random() < ALL_IN_PROB:
+            if equity > ALL_IN_EQUITY_THRESHOLD and random.random() < ALL_IN_PROB:
                 return RaiseAction(max_raise)
             if max_wanted_raise > min_cost:
                 return RaiseAction(int(min(max_wanted_raise, max_cost)) + my_pip)
-        if max_wanted_call > continue_cost and CallAction in legal_actions:
+        if ev > continue_cost and CallAction in legal_actions:
             return CallAction()
         if CheckAction in legal_actions:
             return CheckAction()
