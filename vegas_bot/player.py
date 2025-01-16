@@ -131,12 +131,15 @@ class Player(Bot):
             return CheckAction()
         return FoldAction()
         
-        
-        
+        # random bot for testing
         # if RaiseAction in legal_actions:
-        #     if estimate[0] > 0.6:
-        #         return RaiseAction(max_raise)
-        # if estimate[0] < 0.4:
+        #     min_raise, max_raise = round_state.raise_bounds()  # the smallest and largest numbers of chips for a legal bet/raise
+        #     min_cost = min_raise - my_pip  # the cost of a minimum bet/raise
+        #     max_cost = max_raise - my_pip  # the cost of a maximum bet/raise
+        #     raises = [i for i in range(min_raise, max_raise + 1)]
+        #     if random.random() > 0.6:
+        #         return RaiseAction(random.choice(raises))
+        # if random.random() < 0.4:
         #     return FoldAction()
         # if CheckAction in legal_actions:  # check-call
         #     return CheckAction()
