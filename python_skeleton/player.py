@@ -123,10 +123,10 @@ class Player(Bot):
         if equity == 1.:
             theo_call = 800
         else:
-            theo_call = ((opp_pip + my_pip) * (equity - bounty_prob) + ((opp_pip) * BOUNTY_RATIO + BOUNTY_CONSTANT + my_pip) * (bounty_prob)) / (1.-equity) # ev of payout assuming you've lost your pips in [0, pot]
+            theo_call = ((opp_contribution + my_contribution) * (equity - bounty_prob) + ((opp_contribution) * BOUNTY_RATIO + BOUNTY_CONSTANT + my_contribution) * (bounty_prob)) / (1.-equity) # ev of payout assuming you've lost your pips in [0, pot]
         max_wanted_call = theo_call * MAX_CALL_RATIO
         max_wanted_raise = theo_call * MAX_RAISE_RATIO
-        print(f"round {game_state.round_num}, equity {equity}, theo call {theo_call}, my pip {my_pip}, opp pip {opp_pip}")
+        print(f"round {game_state.round_num}, equity {equity}, theo call {theo_call}, my contribution {my_contribution}, opp contribution {opp_contribution}")
         
         if RaiseAction in legal_actions:
             min_raise, max_raise = round_state.raise_bounds()  # the smallest and largest numbers of chips for a legal bet/raise

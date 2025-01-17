@@ -33,9 +33,12 @@ class Player(Bot):
         self.q_table = q_table  
         self.alpha = 0.1  # keep learning rate low for poker?
         self.gamma = 0.9  # idk
-        self.epsilon = 1  
+        self.epsilon = 0.8
+        self.min_epsilon = 0.1
+        self.decay_rate = 0.99
         self.last_action = None
         self.last_state = None
+        # print(RaiseAction(amount=10) == RaiseAction(amount=10)) made sure comparison works on actions
 
     def handle_new_round(self, game_state, round_state, active):
         '''
@@ -146,22 +149,23 @@ q_table = {self.q_table}
 
         rounds_left = 1001 - game_state.round_num
         bankroll = game_state.bankroll
-        if bankroll > APPROX_MAX_PREFLOP_PAYOUT * rounds_left:
-            return FoldAction()
+        # if bankroll > APPROX_MAX_PREFLOP_PAYOUT * rounds_left:
+        #     return FoldAction()
 
         equity, bounty_prob = self.estimator.estimate(my_cards, board_cards, my_bounty)
-        ev = int((opp_pip + my_pip) * (equity - bounty_prob) + ((opp_pip) * BOUNTY_RATIO + BOUNTY_CONSTANT + my_pip) * (bounty_prob)) # ev of payout assuming you've lost your pips
+        ev = int((opp_pip + my_contribution) * (equity - bounty_prob) + ((opp_contribution) * BOUNTY_RATIO + BOUNTY_CONSTANT + my_contribution) * (bounty_prob)) # ev of payout assuming you've lost your pips
         max_wanted_raise = ev * MAX_RAISE_RATIO
         
         # state = (ev, my_pip, my_stack, my_contribution, street, opp_pip, opp_stack, opp_contribution)
-        # state = (ev, street, my_stack)
-        state = (ev, street)
+        # state = (ev, street, my_pip, opp_pip, )
+        state = (ev, street, my_pip, my_contribution, opp_pip, opp_contribution)
+        # state = (ev, street) too simple, trained ~3 mil rounds and it got stuck at -16000 for 1000 round games
         
         legal_actions_list = []
         
         if RaiseAction in legal_actions:
             min_raise, max_raise = round_state.raise_bounds()
-            possible_raises = range(min_raise, max_raise + 1, (max_raise - min_raise) // 3 or 1)
+            possible_raises = [min_raise, (max_raise - min_raise) // 2, max_raise] # range(min_raise, max_raise + 1, (max_raise - min_raise) // 3 or 1)
             legal_actions_list.extend(RaiseAction(amount) for amount in possible_raises)
             
         if CheckAction in legal_actions:
@@ -172,6 +176,8 @@ q_table = {self.q_table}
             
         if CallAction in legal_actions:
             legal_actions_list.append(CallAction())
+            
+        self.epsilon = max(self.min_epsilon, self.epsilon * self.decay_rate)
 
         if random.random() < self.epsilon:
             action = random.choice(legal_actions_list)
