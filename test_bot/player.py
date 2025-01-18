@@ -11,7 +11,7 @@ import random
 from estimators import MonteCarloEstimator
 BOUNTY_CONSTANT, BOUNTY_RATIO = 10, 1.5
 
-from table import q_table
+from table import q_table, prev_round_num
 
 import os
 
@@ -95,7 +95,9 @@ class Player(Bot):
         # learn from round, reward is delta
         self.learn(my_delta)
         
-        if game_state.round_num == 1000000:
+        round_num = game_state.round_num
+        
+        if round_num == 1000:
             # print(self.q_table)
 
             # had to gpt this lmao
@@ -111,6 +113,8 @@ from skeleton.states import GameState, TerminalState, RoundState
 from skeleton.states import NUM_ROUNDS, STARTING_STACK, BIG_BLIND, SMALL_BLIND
 from skeleton.bot import Bot
 from skeleton.runner import parse_args, run_bot
+
+prev_round_num = {round_num + prev_round_num}
                             
 q_table = {self.q_table}
                             """)
