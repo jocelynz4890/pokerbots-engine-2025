@@ -94,12 +94,12 @@ class Player(Bot):
         '''
         street = round_state.street
 
-        MAX_CALL_RATIO = 0.6 # proportion of theo call to call ---- should go up over time
-        MAX_RAISE_RATIO = 0.3 # proportion of theo call to raise by ---- should go up over time
-        ALL_IN_EQUITY_FLOOR = 0.70
-        ALL_IN_EQUITY_CEIL = 1.
-        ALL_IN_PROB = 0.99
-        APPROX_MAX_PREFLOP_PAYOUT = 5
+        MAX_CALL_RATIO = [0.5, 0, 0, 0.3, 0.4, 0.99][street] # proportion of theo call to call ---- should go up over time
+        MAX_RAISE_RATIO = [0.05, 0, 0, 0.15, 0.3, 0.4][street] # proportion of theo call to raise by ---- should go up over time
+        ALL_IN_EQUITY_FLOOR = 0.55
+        ALL_IN_EQUITY_CEIL = 0.7
+        ALL_IN_PROB = 0.1
+        APPROX_MAX_PREFLOP_PAYOUT = 3
         legal_actions = round_state.legal_actions()  # the actions you are allowed to take
           # 0, 3, 4, or 5 representing pre-flop, flop, turn, or river respectively
         my_cards = round_state.hands[active]  # your cards
@@ -116,8 +116,8 @@ class Player(Bot):
 
         rounds_left = 1001 - game_state.round_num
         bankroll = game_state.bankroll
-        # if bankroll > APPROX_MAX_PREFLOP_PAYOUT * rounds_left:
-        #     return FoldAction()
+        if bankroll > APPROX_MAX_PREFLOP_PAYOUT * rounds_left:
+            return FoldAction()
 
         equity, bounty_prob = self.estimator.estimate(my_cards, board_cards, my_bounty)
         if equity == 1.:
@@ -126,8 +126,12 @@ class Player(Bot):
             theo_call = ((opp_contribution + my_contribution) * (equity - bounty_prob) + ((opp_contribution) * BOUNTY_RATIO + BOUNTY_CONSTANT + my_contribution) * (bounty_prob)) / (1.-equity) # ev of payout assuming you've lost your pips in [0, pot]
         max_wanted_call = theo_call * MAX_CALL_RATIO
         max_wanted_raise = theo_call * MAX_RAISE_RATIO
-        print(f"round {game_state.round_num}, equity {equity}, theo call {theo_call}, my contribution {my_contribution}, opp contribution {opp_contribution}")
+        print(f"round {game_state.round_num}, equity {equity}, theo call {theo_call}, my contribution {my_contribution}, opp contribution {opp_contribution},\nmy bounty {my_bounty}, max call {max_wanted_call}, max raise {max_wanted_raise}")
         
+        if equity < [0.6, 0, 0, 0.4, 0.3, 0.2][street]:
+            if CheckAction in legal_actions:
+                return CheckAction()
+            return FoldAction()
         if RaiseAction in legal_actions:
             min_raise, max_raise = round_state.raise_bounds()  # the smallest and largest numbers of chips for a legal bet/raise
             min_cost = min_raise - my_pip  # the cost of a minimum bet/raise
