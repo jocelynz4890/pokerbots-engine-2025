@@ -33,7 +33,7 @@ class Player(Bot):
         self.q_table = q_table  
         self.alpha = 0.1  # keep learning rate low for poker?
         self.gamma = 0.9  # idk
-        self.epsilon = 0.8
+        self.epsilon = 0.95
         self.min_epsilon = 0.1
         self.decay_rate = 0.99
         self.last_action = None
