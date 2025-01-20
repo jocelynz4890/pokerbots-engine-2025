@@ -22,6 +22,8 @@ def state_to_int(ev, street, my_pip, my_contribution, opp_pip, opp_contribution)
     return int(state_int)
 
 pickle_file_path = os.path.join(os.getcwd(), 'table1.pkl')
+main_file_path = os.path.join(os.getcwd(), 'table.pkl')
+
 
 # def convert_old_qtable(old_qtable):
 #     new_qtable = {}
@@ -57,8 +59,8 @@ class Player(Bot):
         print("q_table loaded from pickle") # ! REMOVE FOR SCRIM
         self.alpha = 0.1  # keep learning rate low for poker?
         self.gamma = 0.9  # idk
-        self.epsilon = 0 # ! EDIT FOR SCRIM
-        self.min_epsilon = 0 # ! EDIT FOR SCRIM
+        self.epsilon = 0.95 # ! EDIT FOR SCRIM
+        self.min_epsilon = 0.7 # ! EDIT FOR SCRIM
         self.decay_rate = 0.99
         self.last_action = None
         self.last_state = None
