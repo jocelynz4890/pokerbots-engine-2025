@@ -21,7 +21,7 @@ def state_to_int(ev, street, my_pip, my_contribution, opp_pip, opp_contribution)
     state_int =(str(ev).rjust(3,'0')+str(street)+str(my_pip).rjust(3,'0')+str(my_contribution).rjust(3,'0')+str(opp_pip).rjust(3,'0')+str(opp_contribution).rjust(3,'0'))
     return int(state_int)
 
-pickle_file_path = os.path.join(os.getcwd(), 'table.pkl')
+pickle_file_path = os.path.join(os.getcwd(), 'table1.pkl')
 
 # def convert_old_qtable(old_qtable):
 #     new_qtable = {}
