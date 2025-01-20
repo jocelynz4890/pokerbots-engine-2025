@@ -9,6 +9,7 @@ from skeleton.runner import parse_args, run_bot
 
 import random
 from estimators import MonteCarloEstimator
+from multiprocessing import Pool
 BOUNTY_CONSTANT, BOUNTY_RATIO = 10, 1.5
 
 class Player(Bot):
@@ -129,7 +130,7 @@ class Player(Bot):
             return CallAction()
         if CheckAction in legal_actions:
             return CheckAction()
-        return FoldAction()
+        return FoldAction() 
         
         # random bot for testing
         # if RaiseAction in legal_actions:

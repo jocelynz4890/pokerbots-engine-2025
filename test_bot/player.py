@@ -33,8 +33,8 @@ class Player(Bot):
         self.q_table = q_table  
         self.alpha = 0.1  # keep learning rate low for poker?
         self.gamma = 0.9  # idk
-        self.epsilon = 0.95
-        self.min_epsilon = 0.1
+        self.epsilon = 0.99
+        self.min_epsilon = 0.8
         self.decay_rate = 0.99
         self.last_action = None
         self.last_state = None
@@ -197,6 +197,7 @@ q_table = {self.q_table}
     def select_best_action(self, state, legal_actions):
         if state not in self.q_table:
             self.q_table[state] = {action: 0 for action in legal_actions}
+            print("not found")
 
         best_action = max(legal_actions, key=lambda action: self.q_table[state].get(action, 0))
         return best_action
