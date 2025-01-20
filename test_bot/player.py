@@ -8,10 +8,11 @@ from skeleton.bot import Bot
 from skeleton.runner import parse_args, run_bot
 
 import random
+import pickle
 from estimators import MonteCarloEstimator
 BOUNTY_CONSTANT, BOUNTY_RATIO = 10, 1.5
 
-from table import q_table, prev_round_num
+# from table import q_table, prev_round_num
 
 import os
 
@@ -19,6 +20,8 @@ import os
 def state_to_int(ev, street, my_pip, my_contribution, opp_pip, opp_contribution):
     state_int =(str(ev).rjust(3,'0')+str(street)+str(my_pip).rjust(3,'0')+str(my_contribution).rjust(3,'0')+str(opp_pip).rjust(3,'0')+str(opp_contribution).rjust(3,'0'))
     return int(state_int)
+
+pickle_file_path = os.path.join(os.getcwd(), 'table.pkl')
 
 # def convert_old_qtable(old_qtable):
 #     new_qtable = {}
@@ -48,11 +51,14 @@ class Player(Bot):
         Returns:
         Nothing.
         '''
-        self.q_table = q_table 
+        with open(pickle_file_path, 'rb') as file:
+            self.q_table = pickle.load(file)
+        # self.q_table = q_table
+        print("q_table loaded from pickle") # ! REMOVE FOR SCRIM
         self.alpha = 0.1  # keep learning rate low for poker?
         self.gamma = 0.9  # idk
-        self.epsilon = 0.95
-        self.min_epsilon = 0.7
+        self.epsilon = 0 # ! EDIT FOR SCRIM
+        self.min_epsilon = 0 # ! EDIT FOR SCRIM
         self.decay_rate = 0.99
         self.last_action = None
         self.last_state = None
@@ -105,10 +111,10 @@ class Player(Bot):
         # The following is a demonstration of accessing illegal information (will not work)
         opponent_bounty_rank = previous_state.bounties[1-active]  # attempting to grab opponent's bounty rank
 
-        if my_bounty_hit:
-            print("I hit my bounty of " + bounty_rank + "!")
-        if opponent_bounty_hit:
-            print("Opponent hit their bounty of " + opponent_bounty_rank + "!")
+        # if my_bounty_hit:
+        #     print("I hit my bounty of " + bounty_rank + "!") # ! REMOVE FOR SCRIM
+        # if opponent_bounty_hit:
+        #     print("Opponent hit their bounty of " + opponent_bounty_rank + "!") # ! REMOVE FOR SCRIM
             
         # learn from round, reward is delta
         self.learn(my_delta)
@@ -117,25 +123,27 @@ class Player(Bot):
         
         if round_num == 1000:
             # print(self.q_table)
+            # ! FOR SCRIM, PRINT Q_TABLE AT THE END TO LEARN (or just state + action + reward to manually update later)
 
-            # had to gpt this lmao
             # ! REMOVE WHEN USING IN SCRIM
-            # Assuming self.q_table is the data you want to write
-            file_path = os.path.join(os.getcwd(), 'table.py')
+            with open(pickle_file_path, 'wb') as file:
+                pickle.dump(self.q_table, file)
+            print("q_table has been pickled")
+            
+#             file_path = os.path.join(os.getcwd(), 'table.py')
+#
+#             with open(file_path, 'w') as file:
+#                 file.write(f"""
+# from skeleton.actions import FoldAction, CallAction, CheckAction, RaiseAction
+# from skeleton.states import GameState, TerminalState, RoundState
+# from skeleton.states import NUM_ROUNDS, STARTING_STACK, BIG_BLIND, SMALL_BLIND
+# from skeleton.bot import Bot
+# from skeleton.runner import parse_args, run_bot
 
-            # Open the file in write mode
-            with open(file_path, 'w') as file:
-                file.write(f"""
-from skeleton.actions import FoldAction, CallAction, CheckAction, RaiseAction
-from skeleton.states import GameState, TerminalState, RoundState
-from skeleton.states import NUM_ROUNDS, STARTING_STACK, BIG_BLIND, SMALL_BLIND
-from skeleton.bot import Bot
-from skeleton.runner import parse_args, run_bot
-
-prev_round_num = {round_num + prev_round_num}
+# prev_round_num = {round_num + prev_round_num}
                             
-q_table = {self.q_table}
-                            """)
+# q_table = {self.q_table}
+#                             """)
 
     def get_action(self, game_state, round_state, active):
         '''
@@ -159,7 +167,7 @@ q_table = {self.q_table}
         street = round_state.street  # 0, 3, 4, or 5 representing pre-flop, flop, turn, or river respectively
         my_cards = round_state.hands[active]  # your cards
         board_cards = round_state.deck[:street]  # the board cards
-        print("board:", round_state.deck, "hand:", my_cards)
+        # print("board:", round_state.deck, "hand:", my_cards) # ! REMOVE FOR SCRIM
         my_pip = round_state.pips[active]  # the number of chips you have contributed to the pot this round of betting
         opp_pip = round_state.pips[1-active]  # the number of chips your opponent has contributed to the pot this round of betting
         my_stack = round_state.stacks[active]  # the number of chips you have remaining
@@ -217,6 +225,7 @@ q_table = {self.q_table}
             self.q_table[state] = {action: 0 for action in legal_actions}
             # print("not found")
 
+        # this is the bottleneck
         best_action = max(legal_actions, key=lambda action: self.q_table[state].get(action, 0))
         return best_action
 
