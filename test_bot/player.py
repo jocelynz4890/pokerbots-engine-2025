@@ -15,6 +15,24 @@ from table import q_table, prev_round_num
 
 import os
 
+
+def state_to_int(ev, street, my_pip, my_contribution, opp_pip, opp_contribution):
+    state_int =(str(ev).rjust(3,'0')+str(street)+str(my_pip).rjust(3,'0')+str(my_contribution).rjust(3,'0')+str(opp_pip).rjust(3,'0')+str(opp_contribution).rjust(3,'0'))
+    return int(state_int)
+
+# def convert_old_qtable(old_qtable):
+#     new_qtable = {}
+    
+#     for old_state, action_rewards in old_qtable.items():
+#         ev, street, my_pip, my_contribution, opp_pip, opp_contribution = old_state
+#         new_state = state_to_int(ev, street, my_pip, my_contribution, opp_pip, opp_contribution)
+        
+#         new_qtable[new_state] = {}
+#         for action, reward in action_rewards.items():
+#             new_qtable[new_state][action] = reward
+            
+#     return new_qtable
+
 class Player(Bot):
     '''
     A pokerbot.
@@ -30,11 +48,11 @@ class Player(Bot):
         Returns:
         Nothing.
         '''
-        self.q_table = q_table  
+        self.q_table = q_table 
         self.alpha = 0.1  # keep learning rate low for poker?
         self.gamma = 0.9  # idk
-        self.epsilon = 0.99
-        self.min_epsilon = 0.8
+        self.epsilon = 0.95
+        self.min_epsilon = 0.7
         self.decay_rate = 0.99
         self.last_action = None
         self.last_state = None
@@ -162,7 +180,7 @@ q_table = {self.q_table}
         
         # state = (ev, my_pip, my_stack, my_contribution, street, opp_pip, opp_stack, opp_contribution)
         # state = (ev, street, my_pip, opp_pip, )
-        state = (ev, street, my_pip, my_contribution, opp_pip, opp_contribution)
+        state = state_to_int(ev, street, my_pip, my_contribution, opp_pip, opp_contribution)
         # state = (ev, street) too simple, trained ~3 mil rounds and it got stuck at -16000 for 1000 round games
         
         legal_actions_list = []
@@ -197,7 +215,7 @@ q_table = {self.q_table}
     def select_best_action(self, state, legal_actions):
         if state not in self.q_table:
             self.q_table[state] = {action: 0 for action in legal_actions}
-            print("not found")
+            # print("not found")
 
         best_action = max(legal_actions, key=lambda action: self.q_table[state].get(action, 0))
         return best_action
