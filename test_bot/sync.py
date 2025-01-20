@@ -1,7 +1,7 @@
 import pickle
 import os
 
-from test_bot.player import pickle_file_path, main_file_path
+from player import pickle_file_path, main_file_path
 
 # run this after training using table1/table2/table3 to sync with main table by aggregating results
 
@@ -19,7 +19,7 @@ assert OLD_WEIGHT + NEW_WEIGHT == 1, "weights should sum to 1"
 
 
 new_states = 0
-reward_zero = 0 # num states that have reward==0 (they were just discovered)
+# reward_zero = 0 # num states that have reward==0 (they were just discovered)
 new_action = 0 
 for state, action_rewards in new_table.items():
     if state not in table:
@@ -28,17 +28,17 @@ for state, action_rewards in new_table.items():
         
     for action, reward in action_rewards.items():
         if action in table[state]:
-            if table[state][action] == 0:
-                reward_zero += 1
-                table[state][action] = reward
-            else:
-                # add change in reward
-                table[state][action] = OLD_WEIGHT*table[state][action] + NEW_WEIGHT*reward
+            # if table[state][action] == 0:
+            #     reward_zero += 1
+            #     table[state][action] = reward
+            # else:
+            # add change in reward
+            table[state][action] = OLD_WEIGHT*table[state][action] + NEW_WEIGHT*reward
         else:
             new_action  += 1
             table[state][action] = reward
 
-print(f"{new_states} new states discovered, \nfirst reward set for {reward_zero} previously discovered states, \n{new_action} new actions taken")
+print(f"{new_states} new states discovered, {new_action} new actions taken.")
     
 
 # sync with main
