@@ -1,45 +1,35 @@
-'''
-Simple example pokerbot, written in Python.
-'''
 from skeleton.actions import FoldAction, CallAction, CheckAction, RaiseAction
 from skeleton.states import GameState, TerminalState, RoundState
 from skeleton.states import NUM_ROUNDS, STARTING_STACK, BIG_BLIND, SMALL_BLIND
 from skeleton.bot import Bot
 from skeleton.runner import parse_args, run_bot
-
 import random
-import pickle
 from estimators import MonteCarloEstimator
 BOUNTY_CONSTANT, BOUNTY_RATIO = 10, 1.5
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-
 import math
 import random
 import matplotlib
 import matplotlib.pyplot as plt
 from collections import namedtuple, deque
 from itertools import count
+import pickle
 
-# from table import q_table, prev_round_num
-
-
-# set up matplotlib
-is_ipython = 'inline' in matplotlib.get_backend()
-if is_ipython:
-    from IPython import display
-
-plt.ion()
-
-# if GPU is to be used
-device = torch.device(
-    "cuda" if torch.cuda.is_available() else
-    "mps" if torch.backends.mps.is_available() else
-    "cpu"
-)
+def save_replay_memory(replay_memory, file_path="replay_memory.pkl"):
+    with open(file_path, "wb") as f:
+        pickle.dump(replay_memory, f)
+    print("replay memory saved")
+    
+def load_replay_memory(replay_memory, file_path="replay_memory.pkl"):
+    try:
+        with open(file_path, "rb") as f:
+            replay_memory = pickle.load(f)
+        print("replay memory loaded")
+    except FileNotFoundError:
+        print("replay memory failed to load")
 
 # set up matplotlib
 is_ipython = 'inline' in matplotlib.get_backend()
@@ -57,7 +47,14 @@ device = torch.device(
 
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 
+rankToInt = {'2': 0, '3': 1, '4': 2, '5': 3, '6': 4, '7': 5, '8': 6, '9': 7, 'T': 8, 'J': 9, 'Q': 10, 'K': 11, 'A': 12}
+suitToInt = {'s':0, 'h':1, 'd':2, 'c':3}
+def cardToInd(c):
+    return rankToInt[c[0]] + 13 * suitToInt[c[1]]
+
+
 # buffer for holding recent transitions
+# (experience replay helps stabilize learning, prevents overftting to recent events)
 class ReplayMemory(object):
 
     def __init__(self, capacity):
@@ -90,8 +87,30 @@ class DQN(nn.Module):
         x = F.relu(self.layer2(x))
         return self.layer3(x)
     
-    
+# https://stackoverflow.com/questions/42703500/how-do-i-save-a-trained-model-in-pytorch
+def save_model(policy_net, target_net, optimizer, replay_memory, file_path="model.pth"):
+    torch.save({
+        'policy_net_state_dict': policy_net.state_dict(),
+        'target_net_state_dict': target_net.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+    }, file_path)
+    save_replay_memory(replay_memory)
+    print("model parameters saved")
 
+def load_model(policy_net, target_net, optimizer, replay_memory, file_path="model.pth"):
+    try:
+        params = torch.load(file_path, map_location=device)
+        policy_net.load_state_dict(params['policy_net_state_dict'])
+        target_net.load_state_dict(params['target_net_state_dict'])
+        optimizer.load_state_dict(params['optimizer_state_dict'])
+        load_replay_memory(replay_memory)
+        print("policy, target network, and optimizer loaded successfully")
+    except FileNotFoundError:
+        print("policy, target network, and optimizer load failed")
+    
+#######################################################################################
+##    DQN globals
+#######################################################################################
 BATCH_SIZE = 128 # num transitions to sample from replay buffer
 GAMMA = 0.99 # discount factor
 EPS_START = 0.9 # epsilon stuff
@@ -100,17 +119,22 @@ EPS_DECAY = 1000 # higher = slower decay
 TAU = 0.005 # update rate of target network
 LR = 1e-4 # learning rate of the ``AdamW`` optimizer
 
-n_actions = 403 # call, check, fold, raise with values 1 to 400 (change this to be relative to max/min raise?)
+n_actions = 403 # call, check, fold, TODO raise with values relative to max/min raise
 state = [] 
-n_input = len(state)
+next_state = None
+n_input = 57 # len(state), 5 + 52 
+reward = None
+deltas = []
 
+# the following need to be loaded/saved
 policy_net = DQN(n_input, n_actions).to(device)
 target_net = DQN(n_input, n_actions).to(device)
 target_net.load_state_dict(policy_net.state_dict())
-
 optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
-memory = ReplayMemory(10000)
-
+memory = ReplayMemory(10000) #torch.save doesn't save this so it has to be pickled/unpickled
+load_model(policy_net, target_net, optimizer, memory)
+#######################################################################################
+#######################################################################################
 
 
 def select_action(state, legal_actions, steps_done):
@@ -125,9 +149,6 @@ def select_action(state, legal_actions, steps_done):
             return policy_net(state).max(1).indices.view(1, 1)
     else: # explore
         return torch.tensor([legal_actions], device=device, dtype=torch.long)
-
-
-deltas = []
 
 
 def plot_deltas(show_result=False):
@@ -154,8 +175,6 @@ def plot_deltas(show_result=False):
             display.clear_output(wait=True)
         else:
             display.display(plt.gcf())
-            
-            
             
 
 def optimize_model():
@@ -203,37 +222,6 @@ def optimize_model():
     torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
     optimizer.step()
 
-        action = select_action(state)
-        observation, reward, terminated, truncated, _ = env.step(action.item())
-        reward = torch.tensor([reward], device=device)
-        done = terminated or truncated
-
-        if terminated:
-            next_state = None
-        else:
-            next_state = torch.tensor(observation, dtype=torch.float32, device=device).unsqueeze(0)
-
-        # Store the transition in memory
-        memory.push(state, action, next_state, reward)
-
-        # Move to the next state
-        state = next_state
-
-        # Perform one step of the optimization (on the policy network)
-        optimize_model()
-
-        # Soft update of the target network's weights
-        # θ′ ← τ θ + (1 −τ )θ′
-        target_net_state_dict = target_net.state_dict()
-        policy_net_state_dict = policy_net.state_dict()
-        for key in policy_net_state_dict:
-            target_net_state_dict[key] = policy_net_state_dict[key]*TAU + target_net_state_dict[key]*(1-TAU)
-        target_net.load_state_dict(target_net_state_dict)
-
-        if done:
-            deltas.append(my_delta)
-            plot_deltas()
-            break
 
 class Player(Bot):
     '''
@@ -250,13 +238,11 @@ class Player(Bot):
         Returns:
         Nothing.
         '''
-        self.alpha = 0.1  # keep learning rate low for poker?
-        self.gamma = 0.9  # idk
-        self.epsilon = 0.95 # ! EDIT FOR SCRIM
-        self.min_epsilon = 0.7 # ! EDIT FOR SCRIM
-        self.decay_rate = 0.99
-        self.last_action = None
-        self.last_state = None
+        # self.alpha = 0.1  
+        # self.gamma = 0.9  
+        # self.epsilon = 0.95 
+        # self.min_epsilon = 0.7 
+        # self.decay_rate = 0.99
 
     def handle_new_round(self, game_state, round_state, active):
         '''
@@ -277,8 +263,9 @@ class Player(Bot):
         #big_blind = bool(active)  # True if you are the big blind
         #my_bounty = round_state.bounties[active]  # your current bounty rank
         self.estimator = MonteCarloEstimator()
-        self.last_state = None
-        self.last_action = None
+        state = []
+        next_state = None
+        reward = None
 
     def handle_round_over(self, game_state, terminal_state, active):
         '''
@@ -305,17 +292,17 @@ class Player(Bot):
         # The following is a demonstration of accessing illegal information (will not work)
         opponent_bounty_rank = previous_state.bounties[1-active]  # attempting to grab opponent's bounty rank
 
-        # if my_bounty_hit:
-        #     print("I hit my bounty of " + bounty_rank + "!") # ! REMOVE FOR SCRIM
-        # if opponent_bounty_hit:
-        #     print("Opponent hit their bounty of " + opponent_bounty_rank + "!") # ! REMOVE FOR SCRIM
+        if my_bounty_hit:
+            print("I hit my bounty of " + bounty_rank + "!") 
+        if opponent_bounty_hit:
+            print("Opponent hit their bounty of " + opponent_bounty_rank + "!") 
             
-        # learn from round, reward is delta
-        self.learn(my_delta)
+        deltas.append(my_delta)
+        plot_deltas()
         
-        round_num = game_state.round_num
-        
-        if round_num == 1000:
+        # handle game over
+        if game_state.round_num == 1000:
+            save_model(policy_net, target_net, optimizer, memory)
             plot_deltas(show_result=True)
             plt.ioff()
             plt.show()
@@ -333,7 +320,9 @@ class Player(Bot):
         Returns:
         Your action.
         '''
-        
+        #######################################################################################
+        ##    CALCULATIONS, FOLDING, AND EQUITY
+        #######################################################################################
         MAX_RAISE_RATIO = 0.5 # proportion of EV to raise by
         ALL_IN_EQUITY_THRESHOLD = 0.70
         ALL_IN_PROB = 0.99
@@ -342,7 +331,7 @@ class Player(Bot):
         street = round_state.street  # 0, 3, 4, or 5 representing pre-flop, flop, turn, or river respectively
         my_cards = round_state.hands[active]  # your cards
         board_cards = round_state.deck[:street]  # the board cards
-        # print("board:", round_state.deck, "hand:", my_cards) # ! REMOVE FOR SCRIM
+        print("board:", round_state.deck, "hand:", my_cards) # ! REMOVE FOR SCRIM
         my_pip = round_state.pips[active]  # the number of chips you have contributed to the pot this round of betting
         opp_pip = round_state.pips[1-active]  # the number of chips your opponent has contributed to the pot this round of betting
         my_stack = round_state.stacks[active]  # the number of chips you have remaining
@@ -352,31 +341,63 @@ class Player(Bot):
         my_contribution = STARTING_STACK - my_stack  # the number of chips you have contributed to the pot
         opp_contribution = STARTING_STACK - opp_stack  # the number of chips your opponent has contributed to the pot
 
-        rounds_left = 1001 - game_state.round_num
-        bankroll = game_state.bankroll
+        # rounds_left = 1001 - game_state.round_num
+        # bankroll = game_state.bankroll
         # if bankroll > APPROX_MAX_PREFLOP_PAYOUT * rounds_left:
-        #     return FoldAction()
+        #     return FoldAction()        
 
         equity, bounty_prob = self.estimator.estimate(my_cards, board_cards, my_bounty)
         ev = int((opp_pip + my_contribution) * (equity - bounty_prob) + ((opp_contribution) * BOUNTY_RATIO + BOUNTY_CONSTANT + my_contribution) * (bounty_prob)) # ev of payout assuming you've lost your pips
         max_wanted_raise = ev * MAX_RAISE_RATIO
+        #######################################################################################
+        #######################################################################################
+
+
+
         
-        rankToInt = {'2': 0, '3': 1, '4': 2, '5': 3, '6': 4, '7': 5, '8': 6, '9': 7, 'T': 8, 'J': 9, 'Q': 10, 'K': 11, 'A': 12}
-        suitToInt = {'s':0, 'h':1, 'd':2, 'c':3}
-        def cardToInd(c):
-            return rankToInt[c[0]] + 13 * suitToInt[c[1]]
-        one_hot = zeros = [0]*52
-        indices = [cardToInd(card) for card in board_cards]
+        #######################################################################################
+        ##    TRAINING LOOP
+        #######################################################################################
+        
+        # get the current state info
+        one_hot = [0]*52
+        indices = [cardToInd(card) for card in (board_cards + my_cards)]
         for i in indices:
-            zeros[i] = 1
-        state = [equity, bounty_prob, street, my_contribution, opp_contribution] + one_hot
+            one_hot[i] = 1
         
+        # Move to the "next" state (by entering the get_action method again, our current state = next state from last time)
+        if state: # will only be false during pre-flop, when state is set to []
+            next_state = [equity, bounty_prob, street, my_contribution, opp_contribution] + one_hot
+            next_state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
         
+            # now we will: finish processing the "next" state:
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            # Store the transition in memory
+            memory.push(state, action, next_state, reward)
+                
+            # Perform one step of the optimization (on the policy network)
+            optimize_model()
+
+            # Soft update of the target network's weights
+            # θ′ ← τ θ + (1 −τ )θ′
+            # target net gradually incorporates policy net's weights while retaining some of its own previous weights
+            target_net_state_dict = target_net.state_dict()
+            policy_net_state_dict = policy_net.state_dict()
+            for key in policy_net_state_dict:
+                target_net_state_dict[key] = policy_net_state_dict[key]*TAU + target_net_state_dict[key]*(1-TAU)
+            target_net.load_state_dict(target_net_state_dict)
+            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        
+        # now we can say that our current state is what was previously the next state
+        state = next_state
+        
+        # make new list of legal actions (with raise amounts specified)
+        # also verified that equality checks work on them, like RaiseAction(amount=5) == RaiseAction(amount=5) is true
         legal_actions_list = []
         
         if RaiseAction in legal_actions:
             min_raise, max_raise = round_state.raise_bounds()
-            possible_raises = [min_raise, (max_raise - min_raise) // 2, max_raise] # range(min_raise, max_raise + 1, (max_raise - min_raise) // 3 or 1)
+            possible_raises = [min_raise, (max_raise - min_raise) // 2, max_raise] # TODO
             legal_actions_list.extend(RaiseAction(amount) for amount in possible_raises)
             
         if CheckAction in legal_actions:
@@ -388,36 +409,19 @@ class Player(Bot):
         if CallAction in legal_actions:
             legal_actions_list.append(CallAction())
             
-        self.epsilon = max(self.min_epsilon, self.epsilon * self.decay_rate)
 
-        action = select_action(state)
+        # get action
+        action = select_action(state, legal_actions, game_state.round_num)
+        
+        # reward is concerning because delta is only calculated after an entire round (after river)
+        # so for preflop, flop, and turn we need some sort of intermediate reward. maybe use change in equity
+        new_input, reward = None # TODO
+        reward = torch.tensor([reward], device=device) 
+        
+        #######################################################################################
+        #######################################################################################
         
         return action
-    
-    
-    def select_best_action(self, state, legal_actions):
-        if state not in self.q_table:
-            self.q_table[state] = {action: 0 for action in legal_actions}
-            # print("not found")
-
-        # this is the bottleneck
-        best_action = max(legal_actions, key=lambda action: self.q_table[state].get(action, 0))
-        return best_action
-
-    def learn(self, reward):
-        if self.last_state is None or self.last_action is None:
-            return
-
-        if self.last_state not in self.q_table:
-            self.q_table[self.last_state] = {}
-
-        if self.last_action not in self.q_table[self.last_state]:
-            self.q_table[self.last_state][self.last_action] = 0
-
-        prev_q_value = self.q_table[self.last_state][self.last_action]
-        next_max_q_value = max(self.q_table.get(self.last_state, {}).values(), default=0)
-        new_q_value = prev_q_value + self.alpha * (reward + self.gamma * next_max_q_value - prev_q_value)
-        self.q_table[self.last_state][self.last_action] = new_q_value
 
 
 if __name__ == '__main__':
