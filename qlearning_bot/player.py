@@ -39,6 +39,7 @@ main_file_path = os.path.join(os.getcwd(), 'table.pkl')
             
 #     return new_qtable
 
+
 class Player(Bot):
     '''
     A pokerbot.
@@ -59,7 +60,7 @@ class Player(Bot):
         # self.q_table = q_table
         print("q_table loaded from pickle") # ! REMOVE FOR SCRIM
         self.alpha = 0.1  # keep learning rate low for poker?
-        self.gamma = 0.9  # idk
+        self.gamma = 1  # no discount ig
         self.epsilon = 0#.95 # ! EDIT FOR SCRIM
         self.min_epsilon = 0#.7 # ! EDIT FOR SCRIM
         self.decay_rate = 0.99
