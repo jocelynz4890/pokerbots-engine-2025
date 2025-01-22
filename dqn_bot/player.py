@@ -148,9 +148,9 @@ def select_action(state, legal_actions, steps_done):
             # found, so we pick action with the larger expected reward.
             return policy_net(state).max(1).indices.view(1, 1)
     else: # explore
-        return torch.tensor([legal_actions], device=device, dtype=torch.long)
+        return torch.tensor([legal_actions], device=device, dtype=torch.long) # todo: make it choose an action
 
-
+# todo: this is entirely copy pasted from plot_duration()
 def plot_deltas(show_result=False):
     plt.figure(1)
     deltas_t = torch.tensor(deltas, dtype=torch.float)
