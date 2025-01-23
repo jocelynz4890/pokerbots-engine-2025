@@ -122,9 +122,11 @@ LR = 1e-4 # learning rate of the ``AdamW`` optimizer
 n_actions = 403 # call, check, fold, TODO raise with values relative to max/min raise
 state = [] 
 next_state = None
-n_input = 57 # len(state), 5 + 52 
+n_input = 109 # len(state), 5 + 52 + 52
+rewards = []
 reward = None
 deltas = []
+action = None
 
 # the following need to be loaded/saved
 policy_net = DQN(n_input, n_actions).to(device)
@@ -141,14 +143,14 @@ def select_action(state, legal_actions, steps_done):
     sample = random.random()
     eps_threshold = EPS_END + (EPS_START - EPS_END) * \
         math.exp(-1. * steps_done / EPS_DECAY)
-    if sample > eps_threshold: # exploit
+    if state and sample > eps_threshold: # exploit
         with torch.no_grad():
             # t.max(1) will return the largest column value of each row.
             # second column on max result is index of where max element was
             # found, so we pick action with the larger expected reward.
-            return policy_net(state).max(1).indices.view(1, 1)
+            return policy_net(torch.tensor(state, device=device, dtype=torch.float)).max(1).indices.view(1, 1)
     else: # explore
-        return torch.tensor([legal_actions], device=device, dtype=torch.long) # todo: make it choose an action
+        return random.choice(legal_actions)#torch.tensor([legal_actions], device=device, dtype=torch.long) # todo: make it choose an action
 
 # todo: this is entirely copy pasted from plot_duration()
 def plot_deltas(show_result=False):
@@ -178,6 +180,7 @@ def plot_deltas(show_result=False):
             
 
 def optimize_model():
+    global memory, policy_net, target_net, optimizer
     if len(memory) < BATCH_SIZE:
         return
     transitions = memory.sample(BATCH_SIZE)
@@ -263,9 +266,10 @@ class Player(Bot):
         #big_blind = bool(active)  # True if you are the big blind
         #my_bounty = round_state.bounties[active]  # your current bounty rank
         self.estimator = MonteCarloEstimator()
+        global state, next_state, reward
         state = []
         next_state = None
-        reward = None
+        reward = 0.
 
     def handle_round_over(self, game_state, terminal_state, active):
         '''
@@ -296,10 +300,44 @@ class Player(Bot):
             print("I hit my bounty of " + bounty_rank + "!") 
         if opponent_bounty_hit:
             print("Opponent hit their bounty of " + opponent_bounty_rank + "!") 
-            
+        global deltas, rewards, reward, target_net, policy_net, optimizer, memory, state
         deltas.append(my_delta)
+        rewards.append(my_delta)
         plot_deltas()
-        
+        reward = my_delta
+
+        my_contribution = STARTING_STACK - previous_state.stacks[active]
+        opp_contribution = STARTING_STACK - previous_state.stacks[1-active]
+        board_cards = previous_state.deck[:5]
+        my_cards = previous_state.hands[active]
+        board_card_encoding = [0]*52
+        indices = [cardToInd(card) for card in (board_cards)]
+        for i in indices:
+            board_card_encoding[i] = 1
+        my_card_encoding = [0]*52
+        indices = [cardToInd(card) for card in my_cards]
+        for i in indices:
+            my_card_encoding[i] = 1
+
+        #train on terminal state
+
+        next_state = [my_delta >0, my_bounty_hit, 5, my_contribution, opp_contribution] + board_card_encoding + my_card_encoding
+
+        memory.push(state, action, next_state, my_delta)
+                
+        # Perform one step of the optimization (on the policy network)
+        optimize_model()
+
+        # Soft update of the target network's weights
+        # θ′ ← τ θ + (1 −τ )θ′
+        # target net gradually incorporates policy net's weights while retaining some of its own previous weights
+        target_net_state_dict = target_net.state_dict()
+        policy_net_state_dict = policy_net.state_dict()
+        for key in policy_net_state_dict:
+            target_net_state_dict[key] = policy_net_state_dict[key]*TAU + target_net_state_dict[key]*(1-TAU)
+        target_net.load_state_dict(target_net_state_dict)
+
+
         # handle game over
         if game_state.round_num == 1000:
             save_model(policy_net, target_net, optimizer, memory)
@@ -347,7 +385,7 @@ class Player(Bot):
         #     return FoldAction()        
 
         equity, bounty_prob = self.estimator.estimate(my_cards, board_cards, my_bounty)
-        ev = int((opp_pip + my_contribution) * (equity - bounty_prob) + ((opp_contribution) * BOUNTY_RATIO + BOUNTY_CONSTANT + my_contribution) * (bounty_prob)) # ev of payout assuming you've lost your pips
+        ev = int((opp_contribution + my_contribution) * (equity - bounty_prob) + ((opp_contribution) * BOUNTY_RATIO + BOUNTY_CONSTANT + my_contribution) * (bounty_prob)) # ev of payout assuming you've lost your pips
         max_wanted_raise = ev * MAX_RAISE_RATIO
         #######################################################################################
         #######################################################################################
@@ -360,14 +398,19 @@ class Player(Bot):
         #######################################################################################
         
         # get the current state info
-        one_hot = [0]*52
-        indices = [cardToInd(card) for card in (board_cards + my_cards)]
+        global state, memory, target_net, policy_net
+
+        board_card_encoding = [0]*52
+        indices = [cardToInd(card) for card in (board_cards)]
         for i in indices:
-            one_hot[i] = 1
-        
+            board_card_encoding[i] = 1
+        my_card_encoding = [0]*52
+        indices = [cardToInd(card) for card in my_cards]
+        for i in indices:
+            my_card_encoding[i] = 1
         # Move to the "next" state (by entering the get_action method again, our current state = next state from last time)
         if state: # will only be false during pre-flop, when state is set to []
-            next_state = [equity, bounty_prob, street, my_contribution, opp_contribution] + one_hot
+            next_state = [equity, bounty_prob, street, my_contribution, opp_contribution] + board_card_encoding + my_card_encoding
             next_state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
         
             # now we will: finish processing the "next" state:
@@ -388,8 +431,8 @@ class Player(Bot):
             target_net.load_state_dict(target_net_state_dict)
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         
-        # now we can say that our current state is what was previously the next state
-        state = next_state
+            # now we can say that our current state is what was previously the next state
+            state = next_state
         
         # make new list of legal actions (with raise amounts specified)
         # also verified that equality checks work on them, like RaiseAction(amount=5) == RaiseAction(amount=5) is true
@@ -411,12 +454,12 @@ class Player(Bot):
             
 
         # get action
-        action = select_action(state, legal_actions, game_state.round_num)
+        action = select_action(state, legal_actions_list, game_state.round_num)
         
         # reward is concerning because delta is only calculated after an entire round (after river)
         # so for preflop, flop, and turn we need some sort of intermediate reward. maybe use change in equity
-        new_input, reward = None # TODO
-        reward = torch.tensor([reward], device=device) 
+        rewards = 0. # TODO
+        rewards = torch.tensor([rewards], device=device) 
         
         #######################################################################################
         #######################################################################################
