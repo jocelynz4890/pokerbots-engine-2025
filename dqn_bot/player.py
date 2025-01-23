@@ -150,7 +150,7 @@ def select_action(state, legal_actions, steps_done):
             # found, so we pick action with the larger expected reward.
             return policy_net(torch.tensor(state, device=device, dtype=torch.float)).max(1).indices.view(1, 1)
     else: # explore
-        return random.choice(legal_actions)#torch.tensor([legal_actions], device=device, dtype=torch.long) # todo: make it choose an action
+        return random.choice(legal_actions)#torch.tensor([legal_actions], device=device, dtype=torch.long) # make it choose an action
 
 # todo: this is entirely copy pasted from plot_duration()
 def plot_deltas(show_result=False):
@@ -458,7 +458,7 @@ class Player(Bot):
         
         # reward is concerning because delta is only calculated after an entire round (after river)
         # so for preflop, flop, and turn we need some sort of intermediate reward. maybe use change in equity
-        rewards = 0. # TODO
+        rewards = 0. 
         rewards = torch.tensor([rewards], device=device) 
         
         #######################################################################################
