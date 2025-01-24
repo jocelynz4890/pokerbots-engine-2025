@@ -118,8 +118,9 @@ EPS_END = 0.05
 EPS_DECAY = 1000 # higher = slower decay
 TAU = 0.005 # update rate of target network
 LR = 1e-4 # learning rate of the ``AdamW`` optimizer
-
-n_actions = 403 # call, check, fold, TODO raise with values relative to max/min raise
+raise_increments = [0., 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0] # percentage of [min raise, max raise]
+n_raise_increments = len(raise_increments)
+n_actions = 3 + n_raise_increments # call, check, fold, TODO raise with values relative to max/min raise
 state = [] 
 next_state = None
 n_input = 109 # len(state), 5 + 52 + 52
@@ -141,17 +142,22 @@ load_model(policy_net, target_net, optimizer, memory)
 
 def select_action(state, legal_actions, steps_done):
     sample = random.random()
+    global n_actions
     eps_threshold = EPS_END + (EPS_START - EPS_END) * \
         math.exp(-1. * steps_done / EPS_DECAY)
-    if state and sample > eps_threshold: # exploit
+    if state is not None and sample > eps_threshold: # exploit
         with torch.no_grad():
             # t.max(1) will return the largest column value of each row.
             # second column on max result is index of where max element was
             # found, so we pick action with the larger expected reward.
-            return policy_net(torch.tensor(state, device=device, dtype=torch.float)).max(1).indices.view(1, 1)
+            selected_action = policy_net(state).max(1).indices.view(1, 1)
+            print(f"model says {selected_action}")
+            return selected_action
     else: # explore
-        return random.choice(legal_actions)#torch.tensor([legal_actions], device=device, dtype=torch.long) # make it choose an action
-
+        choice = None
+        while choice is None or legal_actions[choice] == 0:
+            choice = random.randint(0, n_actions-1)#torch.tensor([legal_actions], device=device, dtype=torch.long) # make it choose an action
+        return choice
 # todo: this is entirely copy pasted from plot_duration()
 def plot_deltas(show_result=False):
     plt.figure(1)
@@ -192,15 +198,16 @@ def optimize_model():
     # Compute a mask of non-final states and concatenate the batch elements
     non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
                                           batch.next_state)), device=device, dtype=torch.bool)
-    non_final_next_states = torch.cat([s for s in batch.next_state
-                                                if s is not None])
-    state_batch = torch.cat(batch.state)
-    action_batch = torch.cat(batch.action)
+    non_final_next_states = torch.cat([torch.tensor(s, device = device, dtype = torch.float) for s in batch.next_state])
+    state_batch = torch.cat([torch.tensor(s, device = device, dtype = torch.float) for s in batch.state])
+    action_batch = torch.cat(batch.action).reshape((BATCH_SIZE, 1))
     reward_batch = torch.cat(batch.reward)
 
     # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
     # columns of actions taken. These are the actions which would've been taken
     # for each batch state according to policy_net
+    # print(f"action_batch {action_batch.shape}")
+    # print(f"policy net output {policy_net(state_batch).shape}")
     state_action_values = policy_net(state_batch).gather(1, action_batch)
 
     # Compute V(s_{t+1}) for all next states.
@@ -267,7 +274,7 @@ class Player(Bot):
         #my_bounty = round_state.bounties[active]  # your current bounty rank
         self.estimator = MonteCarloEstimator()
         global state, next_state, reward
-        state = []
+        state = None
         next_state = None
         reward = 0.
 
@@ -300,7 +307,7 @@ class Player(Bot):
             print("I hit my bounty of " + bounty_rank + "!") 
         if opponent_bounty_hit:
             print("Opponent hit their bounty of " + opponent_bounty_rank + "!") 
-        global deltas, rewards, reward, target_net, policy_net, optimizer, memory, state
+        global deltas, rewards, reward, target_net, policy_net, optimizer, memory, state, action
         deltas.append(my_delta)
         rewards.append(my_delta)
         plot_deltas()
@@ -322,8 +329,10 @@ class Player(Bot):
         #train on terminal state
 
         next_state = [my_delta >0, my_bounty_hit, 5, my_contribution, opp_contribution] + board_card_encoding + my_card_encoding
-
-        memory.push(state, action, next_state, my_delta)
+        next_state = torch.tensor(next_state, dtype=torch.float32, device=device).unsqueeze(0)
+        if state is not None:
+            memory.push(state, action, next_state, torch.tensor([my_delta], device = device))
+            # print(f"pushing next_state, action, reward {(next_state, action, my_delta)}")
                 
         # Perform one step of the optimization (on the policy network)
         optimize_model()
@@ -337,13 +346,13 @@ class Player(Bot):
             target_net_state_dict[key] = policy_net_state_dict[key]*TAU + target_net_state_dict[key]*(1-TAU)
         target_net.load_state_dict(target_net_state_dict)
 
-
         # handle game over
         if game_state.round_num == 1000:
             save_model(policy_net, target_net, optimizer, memory)
             plot_deltas(show_result=True)
             plt.ioff()
             plt.show()
+            print(f"deltas {deltas}")
 
     def get_action(self, game_state, round_state, active):
         '''
@@ -398,7 +407,7 @@ class Player(Bot):
         #######################################################################################
         
         # get the current state info
-        global state, memory, target_net, policy_net
+        global state, memory, target_net, policy_net, action, n_raise_increments
 
         board_card_encoding = [0]*52
         indices = [cardToInd(card) for card in (board_cards)]
@@ -409,15 +418,16 @@ class Player(Bot):
         for i in indices:
             my_card_encoding[i] = 1
         # Move to the "next" state (by entering the get_action method again, our current state = next state from last time)
-        if state: # will only be false during pre-flop, when state is set to []
-            next_state = [equity, bounty_prob, street, my_contribution, opp_contribution] + board_card_encoding + my_card_encoding
-            next_state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
+        next_state = [equity, bounty_prob, street, my_contribution, opp_contribution] + board_card_encoding + my_card_encoding
+        next_state = torch.tensor(next_state, dtype=torch.float32, device=device).unsqueeze(0)
+        if state is not None: # will only be false during pre-flop, when state is set to []
+            
         
             # now we will: finish processing the "next" state:
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             # Store the transition in memory
-            memory.push(state, action, next_state, reward)
-                
+            memory.push(state, action, next_state, torch.tensor([reward], device = device))
+            # print(f"pushing next_state, action, reward (non-terminal) {(next_state, action, reward)}")
             # Perform one step of the optimization (on the policy network)
             optimize_model()
 
@@ -432,29 +442,38 @@ class Player(Bot):
             #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         
             # now we can say that our current state is what was previously the next state
-            state = next_state
+        state = next_state
         
         # make new list of legal actions (with raise amounts specified)
         # also verified that equality checks work on them, like RaiseAction(amount=5) == RaiseAction(amount=5) is true
+        min_raise, max_raise = round_state.raise_bounds()
+        model_actions_list = [CallAction(), CheckAction(), FoldAction()] + \
+             [RaiseAction(int(min_raise + p*(max_raise - min_raise))) for p in raise_increments]
         legal_actions_list = []
-        
-        if RaiseAction in legal_actions:
-            min_raise, max_raise = round_state.raise_bounds()
-            possible_raises = [min_raise, (max_raise - min_raise) // 2, max_raise] # TODO
-            legal_actions_list.extend(RaiseAction(amount) for amount in possible_raises)
-            
         if CheckAction in legal_actions:
             legal_actions_list.append(CheckAction())
-            
+        else:
+            legal_actions_list.append(0)
         if FoldAction in legal_actions:
             legal_actions_list.append(FoldAction())
-            
+        else:
+            legal_actions_list.append(0)
         if CallAction in legal_actions:
             legal_actions_list.append(CallAction())
+        else:
+            legal_actions_list.append(0)
+        if RaiseAction in legal_actions:
+            min_raise, max_raise = round_state.raise_bounds()
+            possible_raises = [int(min_raise + p*(max_raise - min_raise)) for p in raise_increments] # TODO
+            legal_actions_list.extend(RaiseAction(amount) for amount in possible_raises)
+        else:
+            legal_actions_list += [0] * n_raise_increments
+            
+        
             
 
         # get action
-        action = select_action(state, legal_actions_list, game_state.round_num)
+        action = torch.tensor([select_action(state, legal_actions_list, game_state.round_num)], device = device)
         
         # reward is concerning because delta is only calculated after an entire round (after river)
         # so for preflop, flop, and turn we need some sort of intermediate reward. maybe use change in equity
@@ -464,7 +483,7 @@ class Player(Bot):
         #######################################################################################
         #######################################################################################
         
-        return action
+        return model_actions_list[action]
 
 
 if __name__ == '__main__':
