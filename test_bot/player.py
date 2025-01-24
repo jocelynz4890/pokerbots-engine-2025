@@ -54,6 +54,7 @@ class Player(Bot):
         Returns:
         Nothing.
         '''
+        # TODO if table has been edited, table1 should also update before starting to train with table1 again
         with open(pickle_file_path, 'rb') as file:
             self.q_table = pickle.load(file)
         # self.q_table = q_table
