@@ -113,11 +113,11 @@ def load_model(policy_net, target_net, optimizer, replay_memory, file_path="mode
 #######################################################################################
 BATCH_SIZE = 128 # num transitions to sample from replay buffer
 GAMMA = 0.99 # discount factor
-EPS_START = 0.9 # epsilon stuff
+EPS_START = 0.9 # epsilon stuff, was 0.9
 EPS_END = 0.05
 EPS_DECAY = 1000 # higher = slower decay
-TAU = 0.005 # update rate of target network
-LR = 1e-4 # learning rate of the ``AdamW`` optimizer
+TAU = 0.005 # update rate of target network, was 0.005
+LR = 1e-3 # learning rate of the ``AdamW`` optimizer, was 1e-4
 raise_increments = [0., 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0] # percentage of [min raise, max raise]
 n_raise_increments = len(raise_increments)
 n_actions = 3 + n_raise_increments # call, check, fold, TODO raise with values relative to max/min raise
