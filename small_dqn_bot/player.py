@@ -113,11 +113,11 @@ def load_model(policy_net, target_net, optimizer, replay_memory, file_path="mode
 #######################################################################################
 BATCH_SIZE = 128 # num transitions to sample from replay buffer
 GAMMA = 0.99 # discount factor
-EPS_START = 0.0 # epsilon stuff, was 0.9
-EPS_END = 0.00
+EPS_START = 0.5 # epsilon stuff, was 0.9
+EPS_END = 0.2
 EPS_DECAY = 1000 # higher = slower decay
 TAU = 0.005 # update rate of target network, was 0.005
-LR = 5e-4 # learning rate of the ``AdamW`` optimizer, was 1e-4
+LR = 1e-4 # learning rate of the ``AdamW`` optimizer, was 1e-4
 raise_increments = [0., 0.01, 0.02, 0.2, 0.6, 1.0] # percentage of [min raise, max raise]
 n_raise_increments = len(raise_increments)
 n_actions = 3 + n_raise_increments # call, check, fold, TODO raise with values relative to max/min raise
@@ -308,9 +308,9 @@ class Player(Bot):
         if opponent_bounty_hit:
             print("Opponent hit their bounty of " + opponent_bounty_rank + "!") 
         global deltas, rewards, reward, target_net, policy_net, optimizer, memory, state, action
-        deltas.append(my_delta)
-        rewards.append(my_delta)
-        plot_deltas()
+        # deltas.append(my_delta)
+        # rewards.append(my_delta)
+        # plot_deltas()
         reward = my_delta
 
         my_contribution = STARTING_STACK - previous_state.stacks[active]
@@ -347,12 +347,12 @@ class Player(Bot):
         target_net.load_state_dict(target_net_state_dict)
 
         # handle game over
-        if game_state.round_num == 1000:
-            save_model(policy_net, target_net, optimizer, memory)
-            plot_deltas(show_result=True)
-            plt.ioff()
-            plt.show()
-            print(f"deltas {deltas}")
+        # if game_state.round_num == 1000:
+        #     save_model(policy_net, target_net, optimizer, memory)
+        #     plot_deltas(show_result=True)
+        #     plt.ioff()
+        #     plt.show()
+        #     print(f"deltas {deltas}")
 
     def get_action(self, game_state, round_state, active):
         '''
