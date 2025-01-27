@@ -76,15 +76,15 @@ class DQN(nn.Module):
 
     def __init__(self, n_input, n_actions):
         super(DQN, self).__init__()
-        self.layer1 = nn.Linear(n_input, 8)
-        self.layer2 = nn.Linear(8, 8)
-        self.layer3 = nn.Linear(8, n_actions)
+        self.layer1 = nn.Linear(n_input, 15)
+        # self.layer2 = nn.Linear(8, 8)
+        self.layer3 = nn.Linear(15, n_actions)
 
     # Called with either one element to determine next action, or a batch
     # during optimization. Returns tensor([[left0exp,right0exp]...]).
     def forward(self, x):
         x = F.relu(self.layer1(x))
-        x = F.relu(self.layer2(x))
+        # x = F.relu(self.layer2(x))
         return self.layer3(x)
     
 # https://stackoverflow.com/questions/42703500/how-do-i-save-a-trained-model-in-pytorch
@@ -113,15 +113,15 @@ def load_model(policy_net, target_net, optimizer, replay_memory, file_path="mode
 #######################################################################################
 BATCH_SIZE = 128 # num transitions to sample from replay buffer
 GAMMA = 0.99 # discount factor
-EPS_START = 0.5 # epsilon stuff, was 0.9
-EPS_END = 0.2
-EPS_DECAY = 1000 # higher = slower decay
-TAU = 0.005 # update rate of target network, was 0.005
-LR = 1e-4 # learning rate of the ``AdamW`` optimizer, was 1e-4
+EPS_START = 0.8 # epsilon stuff, was 0.9
+EPS_END = 0.
+EPS_DECAY = 800 # higher = slower decay, was 1000
+TAU = 0.1 # update rate of target network, was 0.005
+LR = 2e-4 # learning rate of the ``AdamW`` optimizer, was 1e-4
 raise_increments = [0., 0.01, 0.02, 0.2, 0.6, 1.0] # percentage of [min raise, max raise]
 n_raise_increments = len(raise_increments)
 n_actions = 3 + n_raise_increments # call, check, fold, TODO raise with values relative to max/min raise
-state = [] 
+state = []
 next_state = None
 n_input = 5 # len(state), 5 + 52 + 52
 rewards = []
@@ -407,7 +407,7 @@ class Player(Bot):
         #######################################################################################
         
         # get the current state info
-        global state, memory, target_net, policy_net, action, n_raise_increments
+        global state, memory, target_net, policy_net, action, n_raise_increments, reward, rewards
 
         #board_card_encoding = [0]*52
         #indices = [cardToInd(card) for card in (board_cards)]
@@ -469,21 +469,23 @@ class Player(Bot):
         else:
             legal_actions_list += [0] * n_raise_increments
             
-        
+
             
 
         # get action
         action = torch.tensor([select_action(state, legal_actions_list, game_state.round_num)], device = device)
-        
+        actionObj = model_actions_list[action]
         # reward is concerning because delta is only calculated after an entire round (after river)
         # so for preflop, flop, and turn we need some sort of intermediate reward. maybe use change in equity
-        rewards = 0. 
+        reward = 0. if actionObj.__class__ in legal_actions else -20.
+        #reward = -street * 3 if actionObj.__class__ == FoldAction else 0. if actionObj.__class__ in legal_actions else -20. #AAAAAAAAAa
+        rewards = reward
         rewards = torch.tensor([rewards], device=device) 
         
         #######################################################################################
         #######################################################################################
         
-        return model_actions_list[action]
+        return actionObj
 
 
 if __name__ == '__main__':
