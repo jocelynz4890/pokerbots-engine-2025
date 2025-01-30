@@ -123,18 +123,23 @@ class Player(Bot):
         
         # if (equity < 0.4):
         #     return FoldAction()
+        
+        # dont consider opp moves, so that we are immune to bluffs
+        
         if RaiseAction in legal_actions:
             min_raise, max_raise = round_state.raise_bounds()  # the smallest and largest numbers of chips for a legal bet/raise
             min_cost = min_raise - my_pip  # the cost of a minimum bet/raise
             max_cost = max_raise - my_pip  # the cost of a maximum bet/raise
             if equity > ALL_IN_EQUITY_THRESHOLD and random.random() < ALL_IN_PROB:
                 return RaiseAction(max(max_raise-1, min_raise))
-            if equity < 0.4 and random.random() < BLUFF_PROB:
-                return RaiseAction(max_raise) # BLUFF HAHAHHAHHA
+            # bluff
+            if equity < 0.4:
+                if random.random() < (0.7 - (street+1)/10):
+                    return RaiseAction(max_raise)
+                else:
+                    return FoldAction() 
             if max_wanted_raise > min_cost:
                 return RaiseAction(int(min(max_wanted_raise, max_cost)) + my_pip)
-        # if opp_contribution > 300 and my_contribution < 10:
-        #         return FoldAction() DONT CONSIDER OPPONENTS MOVES IN ORDER TO BE IMMUNE TO BLUFFS
         if ev > continue_cost and CallAction in legal_actions:
             return CallAction()
         if CheckAction in legal_actions:
