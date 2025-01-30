@@ -1,7 +1,7 @@
 # PARAMETERS TO CONTROL THE BEHAVIOR OF THE GAME ENGINE
 # DO NOT REMOVE OR RENAME THIS FILE
 PLAYER_1_NAME = "A"
-PLAYER_1_PATH = "./java_skeleton"  # can change to ,/vegas_bot or ./test_bot
+PLAYER_1_PATH = "./vegas_bot_old"  # can change to ,/vegas_bot or ./test_bot
 # NO TRAILING SLASHES ARE ALLOWED IN PATHS
 PLAYER_2_NAME = "B"
 PLAYER_2_PATH = "./vegas_bot" # "./vegas_bot"  # Change this to './player_chatbot' to interact with your own bot!

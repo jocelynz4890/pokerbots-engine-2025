@@ -94,7 +94,7 @@ class Player(Bot):
         '''
         MAX_RAISE_RATIO = 0.5 # proportion of EV to raise by
         ALL_IN_EQUITY_THRESHOLD = 0.70
-        ALL_IN_PROB = 0.03 # was 0.99
+        ALL_IN_PROB = 0.05 # was 0.99
         APPROX_MAX_PREFLOP_PAYOUT = 5
         BLUFF_PROB = 0.1
         legal_actions = round_state.legal_actions()  # the actions you are allowed to take
@@ -116,10 +116,10 @@ class Player(Bot):
         max_wanted_raise = ev * MAX_RAISE_RATIO
         
         # fold unless lead can be increased
-        rounds_left = 1001 - game_state.round_num
-        bankroll = game_state.bankroll
-        if (bankroll > APPROX_MAX_PREFLOP_PAYOUT * rounds_left) and equity < 0.9:
-            return FoldAction()
+        # rounds_left = 1001 - game_state.round_num
+        # bankroll = game_state.bankroll
+        # if (bankroll > APPROX_MAX_PREFLOP_PAYOUT * rounds_left) and equity < 0.9:
+        #     return FoldAction()
         
         # if (equity < 0.4):
         #     return FoldAction()
