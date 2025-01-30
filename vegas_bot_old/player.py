@@ -94,7 +94,7 @@ class Player(Bot):
         '''
         MAX_RAISE_RATIO = 0.5 # proportion of EV to raise by
         ALL_IN_EQUITY_THRESHOLD = 0.70
-        ALL_IN_PROB = 0.05 # was 0.99
+        ALL_IN_PROB = 0.99
         APPROX_MAX_PREFLOP_PAYOUT = 5
         legal_actions = round_state.legal_actions()  # the actions you are allowed to take
         street = round_state.street  # 0, 3, 4, or 5 representing pre-flop, flop, turn, or river respectively
@@ -110,26 +110,22 @@ class Player(Bot):
         my_contribution = STARTING_STACK - my_stack  # the number of chips you have contributed to the pot
         opp_contribution = STARTING_STACK - opp_stack  # the number of chips your opponent has contributed to the pot
 
-        # rounds_left = 1001 - game_state.round_num
-        # bankroll = game_state.bankroll
-        # if bankroll > APPROX_MAX_PREFLOP_PAYOUT * rounds_left:
-        #     return FoldAction()
+        rounds_left = 1001 - game_state.round_num
+        bankroll = game_state.bankroll
+        if bankroll > APPROX_MAX_PREFLOP_PAYOUT * rounds_left:
+            return FoldAction()
 
         equity, bounty_prob = self.estimator.estimate(my_cards, board_cards, my_bounty)
         ev = (opp_contribution + my_contribution) * (equity - bounty_prob) + ((opp_contribution) * BOUNTY_RATIO + BOUNTY_CONSTANT + my_contribution) * (bounty_prob) # ev of payout assuming you've lost your pips
         max_wanted_raise = ev * MAX_RAISE_RATIO
-        if (equity < 0.3):
-            return FoldAction()
         if RaiseAction in legal_actions:
             min_raise, max_raise = round_state.raise_bounds()  # the smallest and largest numbers of chips for a legal bet/raise
             min_cost = min_raise - my_pip  # the cost of a minimum bet/raise
             max_cost = max_raise - my_pip  # the cost of a maximum bet/raise
             if equity > ALL_IN_EQUITY_THRESHOLD and random.random() < ALL_IN_PROB:
-                return RaiseAction(max(max_raise-1, min_raise))
+                return RaiseAction(max_raise)
             if max_wanted_raise > min_cost:
                 return RaiseAction(int(min(max_wanted_raise, max_cost)) + my_pip)
-        # if opp_contribution > 300 and my_contribution < 10:
-        #         return FoldAction() DONT CONSIDER OPPONENTS MOVES IN ORDER TO BE IMMUNE TO BLUFFS
         if ev > continue_cost and CallAction in legal_actions:
             return CallAction()
         if CheckAction in legal_actions:
