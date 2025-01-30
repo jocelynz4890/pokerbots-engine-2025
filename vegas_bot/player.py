@@ -127,7 +127,7 @@ class Player(Bot):
         # dont consider opp moves, so that we are immune to bluffs
         
         if (street == 0) and (equity < 0.45):
-            if random.random() < ALL_IN_PROB:
+            if random.random() < BLUFF_PROB:
                 if RaiseAction in legal_actions:
                     min_raise, max_raise = round_state.raise_bounds()
                     return RaiseAction(max_raise)
@@ -138,8 +138,8 @@ class Player(Bot):
             max_cost = max_raise - my_pip  # the cost of a maximum bet/raise
             if equity > ALL_IN_EQUITY_THRESHOLD and random.random() < ALL_IN_PROB:
                 return RaiseAction(max(max_raise-1, min_raise))
-            # bluff
-            if (equity < 0.3) and (random.random() < BLUFF_PROB) and (street == 3):
+            # bluff on preflop or flop
+            if (equity < 0.3) and (random.random() < BLUFF_PROB) and ((street == 3)):
                 return RaiseAction(max_raise)
             if max_wanted_raise > min_cost:
                 return RaiseAction(int(min(max_wanted_raise, max_cost)) + my_pip)
