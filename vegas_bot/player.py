@@ -94,9 +94,9 @@ class Player(Bot):
         '''
         MAX_RAISE_RATIO = 0.5 # proportion of EV to raise by
         ALL_IN_EQUITY_THRESHOLD = 0.70
-        ALL_IN_PROB = 0.05 # was 0.99
+        ALL_IN_PROB = 0.03 # was 0.99
         APPROX_MAX_PREFLOP_PAYOUT = 5
-        BLUFF_PROB = 0.1
+        BLUFF_PROB = 0.2
         legal_actions = round_state.legal_actions()  # the actions you are allowed to take
         street = round_state.street  # 0, 3, 4, or 5 representing pre-flop, flop, turn, or river respectively
         my_cards = round_state.hands[active]  # your cards
@@ -133,11 +133,8 @@ class Player(Bot):
             if equity > ALL_IN_EQUITY_THRESHOLD and random.random() < ALL_IN_PROB:
                 return RaiseAction(max(max_raise-1, min_raise))
             # bluff
-            if equity < 0.4:
-                if random.random() < (0.7 - (street+1)/10):
-                    return RaiseAction(max_raise)
-                else:
-                    return FoldAction() 
+            if equity < 0.3 and random.random() < BLUFF_PROB:
+                return RaiseAction(max_raise)
             if max_wanted_raise > min_cost:
                 return RaiseAction(int(min(max_wanted_raise, max_cost)) + my_pip)
         if ev > continue_cost and CallAction in legal_actions:
