@@ -110,14 +110,15 @@ class Player(Bot):
         my_contribution = STARTING_STACK - my_stack  # the number of chips you have contributed to the pot
         opp_contribution = STARTING_STACK - opp_stack  # the number of chips your opponent has contributed to the pot
 
-        rounds_left = 1001 - game_state.round_num
-        bankroll = game_state.bankroll
-        if bankroll > APPROX_MAX_PREFLOP_PAYOUT * rounds_left:
-            return FoldAction()
-
         equity, bounty_prob = self.estimator.estimate(my_cards, board_cards, my_bounty)
         ev = (opp_contribution + my_contribution) * (equity - bounty_prob) + ((opp_contribution) * BOUNTY_RATIO + BOUNTY_CONSTANT + my_contribution) * (bounty_prob) # ev of payout assuming you've lost your pips
         max_wanted_raise = ev * MAX_RAISE_RATIO
+        
+        rounds_left = 1001 - game_state.round_num
+        bankroll = game_state.bankroll
+        if (bankroll > APPROX_MAX_PREFLOP_PAYOUT * rounds_left) and equity < 0.8:
+            return FoldAction()
+        
         if RaiseAction in legal_actions:
             min_raise, max_raise = round_state.raise_bounds()  # the smallest and largest numbers of chips for a legal bet/raise
             min_cost = min_raise - my_pip  # the cost of a minimum bet/raise
