@@ -96,7 +96,7 @@ class Player(Bot):
         ALL_IN_EQUITY_THRESHOLD = 0.70
         ALL_IN_PROB = 0.03 # was 0.99
         APPROX_MAX_PREFLOP_PAYOUT = 5
-        BLUFF_PROB = 0.2
+        BLUFF_PROB = 0.1
         legal_actions = round_state.legal_actions()  # the actions you are allowed to take
         street = round_state.street  # 0, 3, 4, or 5 representing pre-flop, flop, turn, or river respectively
         my_cards = round_state.hands[active]  # your cards
@@ -126,6 +126,12 @@ class Player(Bot):
         
         # dont consider opp moves, so that we are immune to bluffs
         
+        if (street == 0) and (equity < 0.45):
+            if random.random() < ALL_IN_PROB:
+                if RaiseAction in legal_actions:
+                    min_raise, max_raise = round_state.raise_bounds()
+                    return RaiseAction(max_raise)
+            return FoldAction()
         if RaiseAction in legal_actions:
             min_raise, max_raise = round_state.raise_bounds()  # the smallest and largest numbers of chips for a legal bet/raise
             min_cost = min_raise - my_pip  # the cost of a minimum bet/raise
@@ -133,7 +139,7 @@ class Player(Bot):
             if equity > ALL_IN_EQUITY_THRESHOLD and random.random() < ALL_IN_PROB:
                 return RaiseAction(max(max_raise-1, min_raise))
             # bluff
-            if equity < 0.3 and random.random() < BLUFF_PROB and street == 3:
+            if (equity < 0.3) and (random.random() < BLUFF_PROB) and (street == 3):
                 return RaiseAction(max_raise)
             if max_wanted_raise > min_cost:
                 return RaiseAction(int(min(max_wanted_raise, max_cost)) + my_pip)
