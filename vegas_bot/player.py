@@ -116,22 +116,26 @@ class Player(Bot):
         max_wanted_raise = ev * MAX_RAISE_RATIO
         
         # fold unless lead can be increased
-        # rounds_left = 1001 - game_state.round_num
-        # bankroll = game_state.bankroll
-        # if (bankroll > APPROX_MAX_PREFLOP_PAYOUT * rounds_left) and equity < 0.8:
-        #     return FoldAction()
+        rounds_left = 1001 - game_state.round_num
+        bankroll = game_state.bankroll
+        if (bankroll > APPROX_MAX_PREFLOP_PAYOUT * rounds_left) and equity < 0.9:
+            return FoldAction()
         
         # if (equity < 0.4):
         #     return FoldAction()
         
         # dont consider opp moves, so that we are immune to bluffs
         
-        if (street == 0) and (equity < 0.45):
-            if random.random() < BLUFF_PROB:
-                if RaiseAction in legal_actions:
-                    min_raise, max_raise = round_state.raise_bounds()
-                    return RaiseAction(max_raise)
-            return FoldAction()
+        # if (street == 0) and (equity < 0.45):
+        #     # bluff
+        #     if random.random() < BLUFF_PROB:
+        #         if RaiseAction in legal_actions:
+        #             min_raise, max_raise = round_state.raise_bounds()
+        #             return RaiseAction(max_raise)
+        #     # always fold if starting with < 0.45 hand strength
+        #     return FoldAction()
+        
+        
         if RaiseAction in legal_actions:
             min_raise, max_raise = round_state.raise_bounds()  # the smallest and largest numbers of chips for a legal bet/raise
             min_cost = min_raise - my_pip  # the cost of a minimum bet/raise
@@ -139,8 +143,8 @@ class Player(Bot):
             if equity > ALL_IN_EQUITY_THRESHOLD and random.random() < ALL_IN_PROB:
                 return RaiseAction(max(max_raise-1, min_raise))
             # bluff on preflop or flop
-            if (equity < 0.3) and (random.random() < BLUFF_PROB) and ((street == 3)):
-                return RaiseAction(max_raise)
+            # if (equity < 0.3) and (random.random() < BLUFF_PROB) and ((street == 3)):
+            #     return RaiseAction(max_raise)
             if max_wanted_raise > min_cost:
                 return RaiseAction(int(min(max_wanted_raise, max_cost)) + my_pip)
         if ev > continue_cost and CallAction in legal_actions:
