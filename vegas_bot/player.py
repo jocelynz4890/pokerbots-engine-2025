@@ -96,7 +96,7 @@ class Player(Bot):
         ALL_IN_EQUITY_THRESHOLD = 0.70
         ALL_IN_PROB = 0.03 # was 0.99
         APPROX_MAX_PREFLOP_PAYOUT = 5
-        BLUFF_PROB = 0.2
+        BLUFF_PROB = 0.1
         legal_actions = round_state.legal_actions()  # the actions you are allowed to take
         street = round_state.street  # 0, 3, 4, or 5 representing pre-flop, flop, turn, or river respectively
         my_cards = round_state.hands[active]  # your cards
