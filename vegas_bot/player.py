@@ -96,6 +96,7 @@ class Player(Bot):
         ALL_IN_EQUITY_THRESHOLD = 0.70
         ALL_IN_PROB = 0.05 # was 0.99
         APPROX_MAX_PREFLOP_PAYOUT = 5
+        BLUFF_PROB = 0.1
         legal_actions = round_state.legal_actions()  # the actions you are allowed to take
         street = round_state.street  # 0, 3, 4, or 5 representing pre-flop, flop, turn, or river respectively
         my_cards = round_state.hands[active]  # your cards
@@ -128,6 +129,8 @@ class Player(Bot):
             max_cost = max_raise - my_pip  # the cost of a maximum bet/raise
             if equity > ALL_IN_EQUITY_THRESHOLD and random.random() < ALL_IN_PROB:
                 return RaiseAction(max(max_raise-1, min_raise))
+            if equity < 0.4 and random.random() < BLUFF_PROB:
+                return RaiseAction(max_raise) # BLUFF HAHAHHAHHA
             if max_wanted_raise > min_cost:
                 return RaiseAction(int(min(max_wanted_raise, max_cost)) + my_pip)
         # if opp_contribution > 300 and my_contribution < 10:
